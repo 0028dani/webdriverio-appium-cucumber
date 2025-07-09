@@ -1,0 +1,60 @@
+name: Android E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: /opt/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-11-jdk wget unzip
+
+      - name: Instalar Android SDK (Command Line Tools)
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip
+          mv cmdline-tools latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "emulator" "system-images;android-33;google_apis;x86_64"
+
+      - name: Criar e iniciar emulador Android
+        run: |
+          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n testEmu -k "system-images;android-33;google_apis;x86_64" --device "pixel"
+          $ANDROID_HOME/emulator/emulator -avd testEmu -no-window -no-audio -no-boot-anim &
+          adb wait-for-device
+          adb shell input keyevent 82  # desbloquear emulador
+
+      - name: Instalar Node.js e dependências do projeto
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Instalar Appium e dependências
+        run: |
+          npm install -g appium
+          appium driver install uiautomator2
+          npm install
+
+      - name: Iniciar Appium
+        run: |
+          appium --log-level error &
+          sleep 10
+
+      - name: Rodar testes
+        run: npx wdio run wdio.conf.js
