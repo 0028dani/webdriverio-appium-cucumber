@@ -36,7 +36,9 @@ jobs:
           unzip cmdline-tools.zip
           mv cmdline-tools latest
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "build-tools;33.0.2"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" "emulator" "platforms;android-33" "build-tools;33.0.2" \
+            "system-images;android-33;google_apis_playstore;x86_64"
 
       - name: Adicionar Android SDK ao PATH
         run: |
@@ -48,16 +50,37 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
-          target: google_apis
-          arch: x86_64 # Corrigido para melhor compatibilidade
+          target: google_apis_playstore
+          arch: x86_64
           force-avd-creation: true
           emulator-options: -no-audio -no-boot-anim -no-window
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            echo "Emulador inicializado com sucesso."
+            echo "Reiniciando servidor ADB"
+            adb kill-server || true
+            adb start-server
+
+            echo "Esperando o emulador iniciar..."
+            adb wait-for-device
+            boot_completed=""
+            for i in {1..60}; do
+              boot_completed=$(adb shell getprop sys.boot_completed 2>&1 | tr -d '\r')
+              if [ "$boot_completed" == "1" ]; then
+                echo "Emulador iniciou com sucesso!"
+                break
+              fi
+              echo "Aguardando boot... ($i)"
+              sleep 5
+            done
+
+            if [ "$boot_completed" != "1" ]; then
+              echo "O emulador não iniciou corretamente"
+              adb devices
+              exit 1
+            fi
+
             adb devices
-            adb shell getprop sys.boot_completed
 
       - name: Instalar Node.js
         uses: actions/setup-node@v4
@@ -72,7 +95,7 @@ jobs:
 
       - name: Iniciar Appium
         run: |
-          nohup appium --log-level error & 
+          nohup appium --log-level error &
           sleep 10
 
       - name: Rodar os testes automatizados
