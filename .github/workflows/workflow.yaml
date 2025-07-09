@@ -46,6 +46,8 @@ jobs:
 
       - name: Criar e iniciar o emulador Android
         run: |
+          export ANDROID_AVD_HOME=$HOME/.android/avd
+          mkdir -p $ANDROID_AVD_HOME
           $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n testEmu -k "system-images;android-33;google_apis;x86_64" --device "pixel" --force
           $ANDROID_HOME/emulator/emulator -list-avds
           nohup $ANDROID_HOME/emulator/emulator -avd testEmu -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
