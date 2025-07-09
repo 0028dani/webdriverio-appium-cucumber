@@ -46,41 +46,58 @@ jobs:
           echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-      - name: Rodar emulador Android e esperar boot
+      - name: Rodar emulador Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           target: google_apis_playstore
           arch: x86_64
           force-avd-creation: true
-          emulator-options: -no-audio -no-boot-anim -no-window
+          emulator-options: -no-window -no-audio -no-boot-anim
           emulator-boot-timeout: 600
           disable-animations: true
-          script: |
-            echo "Reiniciando servidor ADB"
-            adb kill-server || true
-            adb start-server
+          script: echo "Emulador iniciado."
 
-            echo "Esperando o emulador iniciar..."
-            adb wait-for-device
-            boot_completed=""
-            for i in {1..60}; do
-              boot_completed=$(adb shell getprop sys.boot_completed 2>&1 | tr -d '\r')
-              if [ "$boot_completed" == "1" ]; then
-                echo "Emulador iniciou com sucesso!"
-                break
-              fi
-              echo "Aguardando boot... ($i)"
-              sleep 5
-            done
+      - name: Aguardar boot completo do emulador
+        run: |
+          echo "Reiniciando servidor ADB..."
+          adb kill-server || true
+          adb start-server
+          adb wait-for-device
 
-            if [ "$boot_completed" != "1" ]; then
-              echo "O emulador não iniciou corretamente"
-              adb devices
-              exit 1
+          echo "Aguardando o emulador sair de 'offline'..."
+          for i in {1..60}; do
+            state=$(adb get-state || echo "offline")
+            echo "Estado atual: $state"
+            if [ "$state" = "device" ]; then
+              echo "Emulador está pronto!"
+              break
             fi
+            sleep 5
+          done
 
+          if [ "$state" != "device" ]; then
+            echo "Timeout: Emulador não ficou online."
             adb devices
+            exit 1
+          fi
+
+          boot_completed=""
+          echo "Aguardando sys.boot_completed..."
+          for i in {1..60}; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>&1 | tr -d '\r')
+            echo "sys.boot_completed = $boot_completed"
+            if [ "$boot_completed" = "1" ]; then
+              echo "Boot completo!"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$boot_completed" != "1" ]; then
+            echo "Timeout: Emulador não completou o boot."
+            exit 1
+          fi
 
       - name: Instalar Node.js
         uses: actions/setup-node@v4
