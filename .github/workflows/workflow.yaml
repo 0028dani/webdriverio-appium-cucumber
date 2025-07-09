@@ -51,7 +51,27 @@ jobs:
           target: google_apis
           arch: arm64-v8a
           force-avd-creation: true
-          emulator-options: -no-window -no-audio -no-boot-anim
+          emulator-options: -no-audio -no-boot-anim
+          emulator-boot-timeout: 600
+
+      - name: Aguardar emulador iniciar
+        run: |
+          adb wait-for-device
+          boot_completed=""
+          for i in {1..60}; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>&1 | tr -d '\r')
+            if [ "$boot_completed" == "1" ]; then
+              echo "Emulador iniciou!"
+              break
+            fi
+            echo "Aguardando boot do emulador... ($i)"
+            sleep 10
+          done
+
+          if [ "$boot_completed" != "1" ]; then
+            echo "Emulador não inicializou no tempo esperado."
+            exit 1
+          fi
 
       - name: Instalar Node.js e dependências do projeto
         uses: actions/setup-node@v4
