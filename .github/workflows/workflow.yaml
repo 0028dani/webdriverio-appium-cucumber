@@ -1,4 +1,4 @@
-name: Android E2E Tests
+name: Android Appium Tests
 
 on:
   push:
@@ -7,89 +7,58 @@ on:
     branches: [main]
 
 jobs:
-  e2e-tests:
+  test:
+    name: Run Appium Tests on Android Emulator
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_HOME: /opt/android-sdk
-
     steps:
-      - name: Checkout código
+      - name: 📦 Checkout code
         uses: actions/checkout@v4
 
-      - name: Instalar Java 17
-        uses: actions/setup-java@v4
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: '17'
 
-      - name: Instalar dependências do sistema
+      - name: 🤖 Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: 📱 Create Android Emulator
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip libvirt-daemon-system qemu-kvm libgl1-mesa-dev libpulse0
-
-      - name: Instalar Android SDK (Command Line Tools)
-        run: |
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          cd $ANDROID_HOME/cmdline-tools
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip
-          mv cmdline-tools latest
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platform-tools" "emulator" "platforms;android-33" "build-tools;33.0.2" \
-            "system-images;android-33;google_apis_playstore;x86"
-
-      - name: Adicionar Android SDK ao PATH
-        run: |
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-
-      - name: Run Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis_playstore
-          arch: x86
-          force-avd-creation: true
-          emulator-options: -no-audio -no-boot-anim -no-window
-          emulator-boot-timeout: 600
-
-      - name: Aguardar emulador iniciar
-        run: |
+          echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
+          emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
           adb wait-for-device
-          boot_completed=""
-          for i in {1..60}; do
-            boot_completed=$(adb shell getprop sys.boot_completed 2>&1 | tr -d '\r')
-            if [ "$boot_completed" == "1" ]; then
-              echo "Emulador iniciou!"
-              break
-            fi
-            echo "Aguardando boot do emulador... ($i)"
-            sleep 10
-          done
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell input keyevent 82
 
-          if [ "$boot_completed" != "1" ]; then
-            echo "Emulador não inicializou no tempo esperado."
-            exit 1
-          fi
+      - name: 🕒 Wait for emulator to be ready
+        run: |
+          timeout 300 bash -c "until adb shell getprop sys.boot_completed | grep -m 1 '1'; do sleep 5; done"
+          adb shell input keyevent 82
 
-      - name: Instalar Node.js e dependências do projeto
+      - name: 📦 Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
 
-      - name: Instalar Appium e dependências do projeto
+      - name: 📁 Install project dependencies
+        run: npm install
+
+      - name: 🚀 Start Appium Server
         run: |
           npm install -g appium
-          appium driver install uiautomator2
-          npm install
+          appium --log-level error &
+          sleep 10  # aguarda Appium iniciar
 
-      - name: Iniciar Appium
-        run: |
-          nohup appium --log-level error &
-          sleep 10
+      - name: ✅ Run Appium Tests
+        run: npm run note
 
-      - name: Rodar os testes automatizados
-        run: npx wdio run wdio.conf.js 
+      - name: 🧾 Upload test results (opcional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
