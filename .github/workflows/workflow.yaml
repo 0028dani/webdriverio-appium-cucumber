@@ -53,4 +53,18 @@ jobs:
       - name: 📦 Install Node dependencies
         run: npm install
 
-      - name: 🚀 Start A
+      - name: 🚀 Start Appium Server
+        run: |
+          npm install -g appium
+          appium --log-level error &
+          sleep 10
+
+      - name: ✅ Run Appium Tests
+        run: npm run note
+
+      - name: 📤 Upload test results (opcional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
