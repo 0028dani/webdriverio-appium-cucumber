@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Run Appium Tests on Android Emulator
+    name: Build APK and Run Appium Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -27,17 +27,36 @@ jobs:
       - name: ✅ Accept Android SDK Licenses
         run: yes | sdkmanager --licenses
 
+      - name: 🧱 Build APK (assembleDebug)
+        run: ./gradlew assembleDebug
+
       - name: 📦 Install Android system image
         run: yes | sdkmanager "system-images;android-30;google_apis;x86_64"
 
       - name: 📱 Create and start Android Emulator
         run: |
           echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
+
+          # Adiciona diretórios Android SDK ao PATH
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/tools/bin" >> $GITHUB_PATH
+
+          # Permissão para o emulador
+          chmod +x $ANDROID_HOME/emulator/emulator
+
+          # Inicia o emulador
           emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+
           adb wait-for-device
+
+          # Desativa animações para acelerar testes
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+
+          # Desbloqueia a tela
           adb shell input keyevent 82
 
       - name: ⏳ Wait for Emulator to boot
@@ -61,6 +80,12 @@ jobs:
 
       - name: ✅ Run Appium Tests
         run: npm run note
+
+      - name: 📤 Upload APK (opcional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: 📤 Upload test results (opcional)
         if: always()
