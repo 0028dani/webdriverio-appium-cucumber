@@ -1,15 +1,45 @@
+name: Android Appium Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Appium Tests on Android Emulator
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 🤖 Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: ✅ Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: 📦 Install Android system image (x86_64)
+        run: yes | sdkmanager "system-images;android-30;google_apis;x86_64"
+
       - name: 📱 Create and start Android Emulator
         run: |
           echo "no" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
 
-          # Adiciona ferramentas ao PATH
           echo "$ANDROID_SDK_ROOT/emulator" >> $GITHUB_PATH
           echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
           chmod +x $ANDROID_SDK_ROOT/emulator/emulator
 
-          # Inicia o emulador com flags para cold boot, sem snapshot e sem aceleração KVM (não disponível no runner)
           emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-accel -no-snapshot-load &
 
           adb wait-for-device
@@ -24,3 +54,33 @@
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+
+      - name: 📁 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Node dependencies
+        run: npm install
+
+      - name: 🚀 Start Appium Server
+        run: |
+          npm install -g appium
+          appium --log-level error & 
+          sleep 10
+
+      - name: ✅ Run Appium Tests
+        run: npm run note
+
+      - name: 📤 Upload APK (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: 📤 Upload test results (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
