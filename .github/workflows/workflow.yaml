@@ -38,7 +38,7 @@ jobs:
 
       - name: 📱 Create and start Android Emulator
         run: |
-          CMDLINE_TOOLS_PATH=$(ls -d $ANDROID_SDK_ROOT/cmdline-tools/latest*)
+          CMDLINE_TOOLS_PATH=$(ls -d $ANDROID_SDK_ROOT/cmdline-tools/latest* | head -n 1)
           echo "Usando cmdline-tools em: $CMDLINE_TOOLS_PATH"
 
           echo "no" | $CMDLINE_TOOLS_PATH/bin/avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
