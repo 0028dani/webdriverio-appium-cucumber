@@ -24,7 +24,13 @@ jobs:
       - name: 🤖 Set up Android SDK
         uses: android-actions/setup-android@v2
 
-      - name: 📱 Create Android Emulator
+      - name: ✅ Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses
+
+      - name: 📦 Install Android system image
+        run: yes | sdkmanager "system-images;android-30;google_apis;x86_64"
+
+      - name: 📱 Create and start Android Emulator
         run: |
           echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel"
           emulator -avd test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
@@ -34,31 +40,17 @@ jobs:
           adb shell settings put global animator_duration_scale 0
           adb shell input keyevent 82
 
-      - name: 🕒 Wait for emulator to be ready
+      - name: ⏳ Wait for Emulator to boot
         run: |
           timeout 300 bash -c "until adb shell getprop sys.boot_completed | grep -m 1 '1'; do sleep 5; done"
           adb shell input keyevent 82
 
-      - name: 📦 Set up Node.js
+      - name: 📁 Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: 📁 Install project dependencies
+      - name: 📦 Install Node dependencies
         run: npm install
 
-      - name: 🚀 Start Appium Server
-        run: |
-          npm install -g appium
-          appium --log-level error &
-          sleep 10  # aguarda Appium iniciar
-
-      - name: ✅ Run Appium Tests
-        run: npm run note
-
-      - name: 🧾 Upload test results (opcional)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: ./test-results
+      - name: 🚀 Start A
