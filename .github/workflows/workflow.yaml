@@ -92,4 +92,4 @@ jobs:
           sleep 10
 
       - name: Rodar os testes automatizados
-        run: npx wdio run wdio.conf.js
+        run: npx wdio run wdio.conf.js 
